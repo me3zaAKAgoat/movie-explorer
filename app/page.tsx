@@ -2,14 +2,8 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import axios from "axios";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useDebounce } from "@/lib/useDebounce";
 
 //state that holds the list of movies
 //state updating function that fetches on scroll
@@ -19,16 +13,29 @@ export default function Home() {
   const [movies, setMovies] = useState<any>([]);
   const [selectedMovie, setSelectedMovie] = useState<any>(null);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 500);
+  const [searching, setSearching] = useState(false);
 
-  useEffect(() => {
-    axios
-      .get(
-        `https://api.themoviedb.org/3/movie/popular?language=en-US&page=${page}&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
-      )
-      .then((response) => {
-        setMovies((prev: any) => [...prev, ...response.data.results]);
-      });
-  }, [page]);
+  const fetchMovies = async (clearMovies: boolean = false) => {
+    const url = debouncedSearch
+      ? `https://api.themoviedb.org/3/search/movie?language=en-US&query=${debouncedSearch}&page=${page}&include_adult=false&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
+      : `https://api.themoviedb.org/3/movie/popular?language=en-US&page=${page}&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`;
+
+    try {
+      const response = await axios.get(url);
+      if (clearMovies) {
+        setPage(1);
+      }
+      setMovies((prev: any) =>
+        clearMovies
+          ? response.data.results
+          : [...prev, ...response.data.results]
+      );
+    } catch (error) {
+      console.error("Error fetching movies:", error);
+    }
+  };
 
   useEffect(() => {
     window.onscroll = () => {
@@ -41,6 +48,14 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    fetchMovies(true);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (page > 1) fetchMovies();
+  }, [page]);
+
   return (
     <main className="flex flex-col items-center justify-center">
       <div className="flex items-center justify-center gap-4 p-4">
@@ -49,6 +64,8 @@ export default function Home() {
           type="text"
           id="search"
           className="rounded-lg px-2 py-1 text-black"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
       </div>
       <div className="flex flex-wrap items-start justify-center gap-2">
