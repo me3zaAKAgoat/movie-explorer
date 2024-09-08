@@ -4,72 +4,63 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useDebounce } from "@/lib/useDebounce";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  QueryClient,
+  QueryClientProvider,
+  useInfiniteQuery,
+} from "@tanstack/react-query";
+import React from "react";
+
+const fetchMovies = async (page: number = 1, searchTerm: string = "") => {
+  const url = searchTerm
+    ? `https://api.themoviedb.org/3/search/movie?language=en-US&query=${searchTerm}&page=${page}&include_adult=false&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
+    : `https://api.themoviedb.org/3/movie/popular?language=en-US&page=${page}&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`;
+  const response = await axios.get(url);
+  return response.data.results;
+};
+
+const useFetchMovies = () => {
+  return useInfiniteQuery({
+    queryKey: ["movies"],
+    queryFn: ({ pageParam = 1 }) => fetchMovies(pageParam, ""),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage ? lastPage.page + 1 : undefined),
+  });
+};
 
 //state that holds the list of movies
 //state updating function that fetches on scroll
 //turn this into a server side rendered page at first, then split out the client side rendered part
-// add types
+//add types
+//remove NEXT_PUBLIC from client side env vars
 export default function Home() {
-  const [movies, setMovies] = useState<any>([]);
-  const [selectedMovie, setSelectedMovie] = useState<any>(null);
+  const [selectedMovie, setSelectedMovie] = useState(null);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
-  const [searching, setSearching] = useState(false);
-
-  const fetchMovies = async (clearMovies: boolean = false) => {
-    const url = debouncedSearch
-      ? `https://api.themoviedb.org/3/search/movie?language=en-US&query=${debouncedSearch}&page=${page}&include_adult=false&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
-      : `https://api.themoviedb.org/3/movie/popular?language=en-US&page=${page}&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`;
-
-    try {
-      const response = await axios.get(url);
-      if (clearMovies) {
-        setPage(1);
-      }
-      setMovies((prev: any) =>
-        clearMovies
-          ? response.data.results
-          : [...prev, ...response.data.results]
-      );
-    } catch (error) {
-      console.error("Error fetching movies:", error);
-    }
-  };
-
-  useEffect(() => {
-    window.onscroll = () => {
-      if (
-        window.innerHeight + document.documentElement.scrollTop ===
-        document.documentElement.offsetHeight
-      ) {
-        setPage((prev) => prev + 1);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    fetchMovies(true);
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    if (page > 1) fetchMovies();
-  }, [page]);
+//   const [movies, setMovies] = useState<any[]>([]);
+  const { data : movies, isLoading, isError } = useQuery({
+    queryFn: async () => await fetchMovies(page),
+    queryKey: ["movies", page],
+  });
 
   return (
-    <main className="flex flex-col items-center justify-center">
+    <main className="h-screen flex flex-col items-center justify-between">
       <div className="flex items-center justify-center gap-4 p-4">
         <label htmlFor="search">Search</label>
         <input
           type="text"
           id="search"
           className="rounded-lg px-2 py-1 text-black"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          //   value={search}
+          //   onChange={(e) => setSearch(e.target.value)}
         />
       </div>
       <div className="flex flex-wrap items-start justify-center gap-2">
-        {movies.map((movie: any) => (
+		{isLoading && <p>Loading...</p>}
+		{isError && <p>Error</p>}
+        {!isError && !isLoading && movies.map((movie : any) => (
           <MovieCard
             movie={movie}
             key={movie.id}
@@ -77,7 +68,14 @@ export default function Home() {
           />
         ))}
       </div>
-      <Dialog open={selectedMovie} onOpenChange={setSelectedMovie}>
+      <div className="flex items-center justify-center gap-4 p-4">
+        <button>prev</button>
+		<button>next</button>
+      </div>
+      <Dialog
+        open={selectedMovie !== null}
+        onOpenChange={() => setSelectedMovie(null)}
+      >
         <DialogContent className="max-w-none w-auto p-0 border-none drop-shadow-lg bg-transparent">
           <MovieDetails movie={selectedMovie} />
         </DialogContent>
