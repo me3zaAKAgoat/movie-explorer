@@ -1,11 +1,16 @@
 "use client";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useDebounce } from "@/lib/useDebounce";
 import {
   useQuery,
+  useMutation,
+  useQueryClient,
+  QueryClient,
+  QueryClientProvider,
+  useInfiniteQuery,
 } from "@tanstack/react-query";
 import React from "react";
 
@@ -14,7 +19,23 @@ const fetchMovies = async (page: number = 1, searchTerm: string = "") => {
     ? `https://api.themoviedb.org/3/search/movie?language=en-US&query=${searchTerm}&page=${page}&include_adult=false&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
     : `https://api.themoviedb.org/3/movie/popular?language=en-US&page=${page}&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`;
   const response = await axios.get(url);
-  return response.data.results;
+  return {
+    page: page,
+    results: response.data.results,
+    total_pages: response.data.total_pages,
+  };
+};
+
+const useFetchMovies = (searchTerm = "") => {
+  return useInfiniteQuery({
+    queryKey: ["movies", searchTerm],
+    queryFn: async ({ pageParam = 1 }) => await fetchMovies(pageParam, searchTerm),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      return lastPage.page + 1;
+    },
+    staleTime: 1000 * 60 * 60 * 24,
+  });
 };
 
 //state that holds the list of movies
@@ -24,19 +45,30 @@ const fetchMovies = async (page: number = 1, searchTerm: string = "") => {
 //remove NEXT_PUBLIC from client side env vars
 export default function Home() {
   const [selectedMovie, setSelectedMovie] = useState(null);
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500) as string;
-    // const [movies, setMovies] = useState<any[]>([]);
-  const {
-    data: movies,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryFn: async () => await fetchMovies(page, debouncedSearch),
-    queryKey: ["movies", page, debouncedSearch],
-	staleTime: 60 * 1000,
-  });
+  const { data, fetchNextPage, hasNextPage, isLoading, isError } =
+    useFetchMovies(debouncedSearch);
+  const movieListElementRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const isBottom = !Math.floor(
+        Math.abs(
+          movieListElementRef.current?.getBoundingClientRect().bottom! -
+            document.documentElement.clientHeight
+        )
+      );
+      if (isBottom) {
+        fetchNextPage();
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   return (
     <main className="h-screen flex flex-col items-center justify-between">
@@ -46,28 +78,28 @@ export default function Home() {
           type="text"
           id="search"
           className="rounded-lg px-2 py-1 text-black"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
       </div>
-      <div className="flex flex-wrap items-start justify-center gap-2">
+      <div
+        ref={movieListElementRef}
+        className="flex flex-wrap items-start justify-center gap-2"
+      >
         {isLoading && <p>Loading...</p>}
         {isError && <p>Error</p>}
         {!isError &&
           !isLoading &&
-          movies.map((movie: any) => (
-            <MovieCard
-              movie={movie}
-              key={movie.id}
-              setSelectedMovie={setSelectedMovie}
-            />
-          ))}
+          data?.pages.map((page: any) =>
+            page.results.map((movie: any) => (
+              <MovieCard
+                movie={movie}
+                key={movie.id}
+                setSelectedMovie={setSelectedMovie}
+              />
+            ))
+          )}
       </div>
-	  <div className="flex items-center justify-center gap-4 p-4">
-		<button className="disabled:opacity-50" disabled={page === 1} 
-		onClick={() => setPage((prev) => prev - 1)}>prev</button>
-		<button onClick={() => setPage((prev) => prev + 1)}>next</button>
-	  </div>
       <Dialog
         open={selectedMovie !== null}
         onOpenChange={() => setSelectedMovie(null)}
