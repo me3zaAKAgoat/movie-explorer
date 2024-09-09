@@ -117,10 +117,10 @@ function MovieCard({
   setSelectedMovie: any;
 }) {
   return (
-    <div className="w-48">
+    <div className="w-28 sm:w-48">
       <img
         src={`https://image.tmdb.org/t/p/original${movie.poster_path}`}
-        alt="movie.title"
+        alt={movie.original_title}
         className="rounded-lg border-2 border-black hover:border-purple-400 transition-all hover:brightness-75 cursor-pointer"
         onClick={() => setSelectedMovie(movie)}
       />
@@ -133,11 +133,11 @@ function MovieCard({
 function MovieDetails({ movie }: { movie: Movie | null }) {
   if (!movie) return null;
   return (
-    <div className="h-[80vh] w-[80vw] flex items-start justify-center gap-4 bg-black/70 p-4 rounded-xl">
+    <div className="sm:h-[80vh] w-[80vw] flex items-start justify-center gap-4 bg-black/80 p-4 rounded-xl">
       <img
         src={`https://image.tmdb.org/t/p/original${movie.poster_path}`}
-        alt="movie.title"
-        className="h-full rounded-lg border-2 border-black"
+        alt={movie.original_title}
+        className="sm:h-full h-48 rounded-lg border-2 border-black"
       />
       <div className="h-full flex flex-col items-start justify-between gap-2">
         <div className="flex flex-col items-start justify-center gap-2">
