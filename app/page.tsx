@@ -49,6 +49,10 @@ export default function Home() {
   const movieListElementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    console.log(
+      movieListElementRef.current?.getBoundingClientRect().bottom!,
+      document.documentElement.clientHeight
+    );
     const handleScroll = () => {
       const isBottom = !Math.floor(
         Math.abs(
@@ -56,16 +60,23 @@ export default function Home() {
             document.documentElement.clientHeight
         )
       );
-      if (isBottom) {
+      if (isBottom && hasNextPage) {
         fetchNextPage();
       }
     };
+
+    if (
+      movieListElementRef.current?.getBoundingClientRect().bottom! <
+      document.documentElement.clientHeight
+    )
+      fetchNextPage();
+
     window.addEventListener("scroll", handleScroll);
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
-  }, [fetchNextPage]);
+  }, [fetchNextPage, data]);
 
   return (
     <main className="h-screen flex flex-col items-center justify-start">
