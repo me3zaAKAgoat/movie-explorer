@@ -1,5 +1,0 @@
-- a grid to show the popular movies (get inspired by popcorn time)
-- on click show a shadcn modal that shows the movies details
-- how to do scroll pagination?
-- how to use react query?
-- need debounce hook for search queries
